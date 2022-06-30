@@ -1,0 +1,203 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %> 
+<style>
+	#comments li{
+		list-style:none;
+	}
+	
+	#modDiv{
+		display:none;
+	}
+</style>
+
+<div>
+
+	<c:if test="${!empty userInfo}">
+		<table class="table table-bordered table-striped table-sm">
+			<tr>
+				<th colspan="2" >ADD NEW COMMENT</th>
+			</tr>
+			<tr>
+				<td style="width:150px;">COMMENT AUTH</td>
+				<td><input type="text" id="commentAuth" class="form-control" name="commentAuth" value="${userInfo.gambler_name}" readonly/></td>
+			</tr>
+			<tr>
+				<td>COMMENT TEXT</td>
+				<td><textarea class="form-control" id="commentText" name="commentText" rows="3" ></textarea></td>
+			</tr>
+			<tr>
+				<td colspan=2><input type="button" id="commentAddBtn" class="btn btn-primary" value="ADD COMMENT"/></td>
+			</tr>
+		</table>
+	</c:if>
+</div>
+<br/><hr/><br/>
+<div id="modDiv">
+	<h3>´ñ±Û ¼öÁ¤ &amp; »èÁ¦</h3>
+	<!-- ´ñ±Û ¹øÈ£ -->
+	<div class="mod-title"></div>
+	<!-- ´ñ±Û ³»¿ë -->
+	<div>
+		<input type="text" id="modCommentText"/>
+	</div>
+	<div>
+		<input type="button" id="commentModBtn" value="MODIFY"/>
+		<input type="button" id="commentDelBtn" value="DELETE"/>	
+		<input type="button" id="closeBtn" value="CLOSE"/>		
+	</div>
+	<br/><hr/><br/>
+</div>
+<div>
+	<ul id="comments">
+	
+	</ul>
+</div>
+<script>
+	var bno = "${board.bno}";
+	
+	var commentPage = 1;
+	
+	getListPage(commentPage);
+	
+	$("#comments").on("click",".commentLi button",function(){
+		var commentWrap = $(this).parent();
+		var cno = commentWrap.attr("data-cno");
+		var text = commentWrap.attr("data-text");
+		$(".mod-title").html(cno);
+		$("#modCommentText").val(text);
+		
+		$("#modDiv").toggle("slow");
+		
+		$("#modCommentText").focus();
+	});
+	
+	$("#closeBtn").click(function(){
+		$("#modDiv").toggle("slow");
+	});
+	
+	// ´ñ±Û ¼öÁ¤
+	$("#commentModBtn").click(function(){
+		var cno = $(".mod-title").html();
+		var text = $("#modCommentText").val();
+		
+		$.ajax({
+			type : "patch",
+			url : contextPath+"/comments/"+cno,
+			headers : {
+				"Content-Type" : "application/json",
+				"X-HTTP-Method-Override" : "PATCH"
+			},
+			data : JSON.stringify({
+				commentText : text
+			}),
+			dataType : "text",
+			success : function(data){
+				alert(data);
+				$("#modDiv").hide("slow");
+				getListPage(commentPage);
+			}
+		});
+	});
+	
+	// ´ñ±Û »èÁ¦
+	$("#commentDelBtn").click(function(){
+		var cno = $(".mod-title").html();
+		
+		$.ajax({
+			type : "delete",
+			url : contextPath+"/comments/"+cno,
+			headers : {
+				"X-HTTP-Override":"DELETE"
+			},
+			dataType : "text",
+			success : function(data){
+				alert(data);
+				$("#modDiv").hide("slow");
+				getListPage(commentPage);
+			}
+		});
+	});
+	
+
+	// ´ñ±Û »ðÀÔ
+	$("#commentAddBtn").click(function(){
+		var commentAuth = $("#commentAuth").val();
+		var commentText = $("#commentText").val();
+		
+		$.ajax({
+			type : "post",
+			url : contextPath+"/comments/add",
+			headers : {
+				"Content-Type" : "application/json",
+				"X-HTTP-Method-Override" : "POST"
+			},
+			data : JSON.stringify({
+				bno : bno,
+				commentText : commentText,
+				commentAuth : commentAuth,
+				gambler_num : "${userInfo.gambler_num}"
+			}),
+			dataType : "text",
+			success : function(data){
+				alert(data);
+				getListPage(1);
+				$("#commentText").val("");
+				$("#commentText").focus();
+			},
+			erro : function(res){
+				alert(res.responseText);
+			}
+		});
+	});
+	
+	// ´ñ±Û ¸ñ·Ï
+	function getListPage(page){
+		$.getJSON(contextPath+"/comments/"+bno+"/"+page,function(data){
+			// data == Map<String,Object> 
+			// data.list = List<CommentVO> 
+			// data.pageMaker = PageMaker
+			
+			var str = "";
+			$(data.list).each(function(){
+				str += "<li data-cno='"+this.cno+"' data-text='"+this.commentText+"' class='commentLi'>";
+				str += 'ÀÛ¼ºÀÚ : '+this.commentAuth+'- ÀÛ¼º½Ã°£ : ' + getDate(this.updatedate);
+				str += '<br/> ³»¿ë : ' + this.commentText
+				if(isCheckUser(this.uno)){
+					str += ' - <button>modify</button>';	
+				}
+				str += "</li>";
+				str += "<li>--------------------------------</li>";
+			});
+			$("#comments").html(str);
+		});
+	}
+	
+	function isCheckUser(gambler_num){
+		var userUno = '${userInfo.gambler_num}';
+		if(userUno != "" && userUno == gambler_num){
+			return true;
+		}
+		return false;
+	}
+	
+	
+	
+	function getDate(timeValue){
+		var dateObj = new Date(timeValue);
+		var year = dateObj.getFullYear();
+		var month = dateObj.getMonth()+1;
+		var date = dateObj.getDate();
+		var hour = dateObj.getHours();
+		var minute = dateObj.getMinutes();
+		var seconds = dateObj.getSeconds();
+		
+		return year + "/"+ month + "/"+ date +" " + hour+":"+minute+":"+seconds; 
+		
+	}
+	
+	
+	
+	
+
+</script>
